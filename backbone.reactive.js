@@ -16,8 +16,9 @@ Backbone.ReactiveModel = function (attributes, options) {
 		that._reactiveRecompute(propName);
 
 		// When a dependency changes, recompute all properties that depend on it.
-		_.each(reactive[propName].deps, function (depName) {
-			that.on("change:" + depName, function () {
+		_.each(reactive[propName].deps, function (dep) {
+			dep = that._normalizeDependency(dep);
+			that.listenTo(dep.source, "change:" + dep.name, function () {
 				that._reactiveRecompute(propName);
 			});
 		});
@@ -27,8 +28,23 @@ Backbone.ReactiveModel = function (attributes, options) {
 _.extend(Backbone.ReactiveModel.prototype, Backbone.Model.prototype, {
 	_reactiveRecompute: function (propName) {
 		var depValues = _.map(this._reactiveSpec[propName].deps,
-				this.get.bind(this));
+				this._valueOfDependency.bind(this));
 		var value = this._reactiveSpec[propName].compute.apply(null, depValues);
+		console.log(propName + " => " + value);
 		this.set(propName, value);
+	},
+	_normalizeDependency: function (dep) {
+		if (typeof dep === "object") {
+			return dep;
+		} else {
+			return {
+				source: this,
+				name: dep
+			};
+		}
+	},
+	_valueOfDependency: function (dep) {
+		dep = this._normalizeDependency(dep);
+		return dep.source.get(dep.name);
 	}
 });
