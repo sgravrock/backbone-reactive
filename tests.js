@@ -30,6 +30,23 @@ describe("Reactive Backbone properties", function () {
 
 	describe("that depend on propreties of other models", function () {
 		var source, target;
+
+		var isReachable = function (source, dest) {
+			var k;
+
+			if (source === dest) {
+				return true;
+			}
+
+			for (k in source) {
+				if (typeof source[k] === "object" && isReachable(source[k], dest)) {
+					console.log("reachable via " + k);
+					return true;
+				}
+			}
+
+			return false;
+		};
 	
 		beforeEach(function () {
 			source = new Backbone.Model({ a: 1 });
@@ -56,12 +73,10 @@ describe("Reactive Backbone properties", function () {
 			expect(listener).toHaveBeenCalledWith(target, 5, {});
 		});
 
-		it("should not update after stopListening has been called", function () {
-			var listener = jasmine.createSpy("change listener");
-			target.on("change:c", listener);
+		it("should not leak memory", function () {
+			expect(isReachable(target, source)).toEqual(true, "Bug in isReachable");
 			target.stopListening();
-			source.set("a", 3);
-			expect(listener).not.toHaveBeenCalled();
+			expect(isReachable(target, source)).toEqual(false);
 		});
 	});
 });

@@ -26,6 +26,12 @@ Backbone.ReactiveModel = function (attributes, options) {
 };
 
 _.extend(Backbone.ReactiveModel.prototype, Backbone.Model.prototype, {
+	stopListening: function () {
+		Backbone.Model.prototype.stopListening.apply(this, arguments);
+		// Drop references to the objects we depend on,
+		// so we don't cause a memory leak.
+		this._reactiveSpec = null;
+	},
 	_reactiveRecompute: function (propName) {
 		var depValues = _.map(this._reactiveSpec[propName].deps,
 				this._valueOfDependency.bind(this));
