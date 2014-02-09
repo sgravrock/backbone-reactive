@@ -25,7 +25,10 @@ Backbone.ReactiveModel = function (attributes, options) {
 	});
 };
 
-_.extend(Backbone.ReactiveModel.prototype, Backbone.Model.prototype, {
+Backbone.ReactiveModel.prototype = new Backbone.Model();
+Backbone.ReactiveModel.prototype.constructor = Backbone.ReactiveModel;
+
+_.extend(Backbone.ReactiveModel.prototype, {
 	stopListening: function () {
 		Backbone.Model.prototype.stopListening.apply(this, arguments);
 		// Drop references to the objects we depend on,

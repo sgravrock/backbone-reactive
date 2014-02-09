@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html>
+	<head><title>Demo</title></head>
+	<body>
+		<div id="root"></div>
+		<script type="text/html" id="template-cartListView">
+			<table>
+				<thead>
+					<tr>
+						<th>Item</th>
+						<th>Price each</th>
+						<th>Quantity</th>
+						<th>Total</th>
+					</tr>
+					<tbody></tbody>
+				</thead>
+			</table>
+		</script>
+		<script type="text/html" id="template-cartItemView">
+			<td><%-name%></td>
+			<td>$<%-unitPrice%></td>
+			<td><input type="text" class="qty" value="<%-qty%>" size="4"></td>
+			<td>$<span class="totalPrice"><%=totalPrice%></span></td>
+		</script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/1.11.0/jquery.js"></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore.js"></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.0/backbone.js"></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/backbone.marionette/1.5.1-bundled/backbone.marionette.js"></script>
+		<script src="backbone.reactive.js"></script>
+		<script src="demo.js"></script>
+	</body>
+</html>
