@@ -9,19 +9,26 @@ Backbone.ReactiveModel = function (attributes, options) {
 
 	Backbone.Model.call(this, attributes, options);
 	this._reactiveSpec = reactive;
+	this._reactiveProps = [];
 
 	_.chain(reactive).keys().each(function (propName) {
-		// Compute the initial for the dependency
-		// TODO: allow dependencies to be on different model objects
-		that._reactiveRecompute(propName);
+		var propSpec = reactive[propName];
 
-		// When a dependency changes, recompute all properties that depend on it.
-		_.each(reactive[propName].deps, function (dep) {
-			dep = that._normalizeDependency(dep);
-			that.listenTo(dep.source, "change:" + dep.name, function () {
-				that._reactiveRecompute(propName);
+		if (propSpec.collection) {
+			that._reactiveProps.push(new Backbone.ReactiveModel.CollectionPlucker(that, propName,
+				propSpec));
+		} else {
+			// Compute the initial value for the dependency
+			that._reactiveRecompute(propName);
+	
+			// When a dependency changes, recompute all properties that depend on it.
+			_.each(propSpec.deps, function (dep) {
+				dep = that._normalizeDependency(dep);
+				that.listenTo(dep.source, "change:" + dep.name, function () {
+					that._reactiveRecompute(propName);
+				});
 			});
-		});
+		}
 	});
 };
 
@@ -33,7 +40,10 @@ _.extend(Backbone.ReactiveModel.prototype, {
 		Backbone.Model.prototype.stopListening.apply(this, arguments);
 		// Drop references to the objects we depend on,
 		// so we don't cause a memory leak.
-		this._reactiveSpec = null;
+		_.each(this._reactiveProps, function (p) {
+			p.stopListening();
+		});
+		this._reactiveProps = this._reactiveSpec = null;
 	},
 	_reactiveRecompute: function (propName) {
 		var depValues = _.map(this._reactiveSpec[propName].deps,
@@ -55,5 +65,28 @@ _.extend(Backbone.ReactiveModel.prototype, {
 	_valueOfDependency: function (dep) {
 		dep = this._normalizeDependency(dep);
 		return dep.source.get(dep.name);
+	}
+});
+
+Backbone.ReactiveModel.CollectionPlucker = function (target, targetProp, spec) {
+	var that = this;
+	this._target = target;
+	this._targetProp = targetProp;
+	this._spec = spec;
+
+	// Compute the initial value.
+	this._recompute();
+
+	// When a dependency changes, recompute.
+	this.listenTo(spec.collection, "add remove reset", this._recompute);
+	spec.collection.each(function (m) {
+		that.listenTo(m, "change:" + spec.pluck, that._recompute);
+	});
+};
+
+_.extend(Backbone.ReactiveModel.CollectionPlucker.prototype, Backbone.Events, {
+	_recompute: function () {
+		var value = this._spec.compute.apply(null, this._spec.collection.pluck(this._spec.pluck));
+		this._target.set(this._targetProp, value);
 	}
 });

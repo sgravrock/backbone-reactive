@@ -3,7 +3,7 @@
 	<head><title>Demo</title></head>
 	<body>
 		<div id="root"></div>
-		<script type="text/html" id="template-cartListView">
+		<script type="text/html" id="template-cartView">
 			<table>
 				<thead>
 					<tr>
@@ -12,7 +12,15 @@
 						<th>Quantity</th>
 						<th>Total</th>
 					</tr>
-					<tbody></tbody>
+					<tbody class="items"></tbody>
+					<tbody>
+						<tr>
+							<td>Grand total</td>
+							<td></td>
+							<td></td>
+							<td>$<span class="grandTotalPrice"><%-grandTotalPrice%></span></td>
+						</tr>
+					</tbody>
 				</thead>
 			</table>
 		</script>

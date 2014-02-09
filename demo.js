@@ -20,16 +20,22 @@
 		}
 	});
 
-	var CartListView = Marionette.CompositeView.extend({
-		template: "#template-cartListView",
-		itemViewContainer: "tbody",
-		itemView: CartItemView
+	var CartView = Marionette.CompositeView.extend({
+		template: "#template-cartView",
+		itemViewContainer: ".items",
+		itemView: CartItemView,
+		onRender: function () {
+			this.listenTo(this.model, "change:grandTotalPrice", this.grandTotalPriceChanged);
+		},
+		grandTotalPriceChanged: function () {
+			this.$el.find(".grandTotalPrice").text(this.model.get("grandTotalPrice"));
+		}
 	});
 
 	var app = new Marionette.Application();
 
 	app.addInitializer(function () {
-		var items = _.map([
+		var items = new Backbone.Collection(_.map([
 			{ name: "Case of dynamite", unitPrice: 60, qty: 1 },
 			{ name: "Anvil", unitPrice: 50, qty: 2 },
 			{ name: "Paint-on tunnel", unitPrice: 20, qty: 1 }
@@ -43,11 +49,28 @@
 				}
 			};
 			return new Backbone.ReactiveModel(spec);
-		});
+		}));
 
-		var cart = new Backbone.Collection(items);
-		app.root.show(new CartListView({
-			collection: cart
+		var cart = new Backbone.ReactiveModel({
+			reactive: {
+				grandTotalPrice: {
+					collection: items,
+					pluck: "totalPrice",
+					compute: function () {
+						var i, sum = 0;
+
+						for (i = 0; i < arguments.length; i++) {
+							sum += arguments[i];
+						}
+
+						return sum;
+					}
+				}
+			}
+		});
+		app.root.show(new CartView({
+			model: cart,
+			collection: items
 		}));
 	});
 
