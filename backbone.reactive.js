@@ -1,18 +1,19 @@
 Backbone.ReactiveModel = function (attributes, options) {
-	var that = this, reactive = {};
+	var that = this, reactiveAttr;
 
 	if (attributes) {
-		reactive = attributes.reactive;
+		reactiveAttr = attributes.reactive;
 		attributes = _.clone(attributes);
 		delete attributes.reactive;
 	}
 
 	Backbone.Model.call(this, attributes, options);
-	this._reactiveSpec = reactive;
+	// We may get our reactive spec from ctor arguments or inherit them from a prototype.
+	this.reactive = reactiveAttr || this.reactive || {};
 	this._reactiveProps = [];
 
-	_.chain(reactive).keys().each(function (propName) {
-		var propSpec = reactive[propName];
+	_.chain(this.reactive).keys().each(function (propName) {
+		var propSpec = that.reactive[propName];
 
 		if (propSpec.collection) {
 			that._reactiveProps.push(new Backbone.ReactiveModel.CollectionPlucker(that, propName,
@@ -34,6 +35,7 @@ Backbone.ReactiveModel = function (attributes, options) {
 
 Backbone.ReactiveModel.prototype = new Backbone.Model();
 Backbone.ReactiveModel.prototype.constructor = Backbone.ReactiveModel;
+Backbone.ReactiveModel.extend = Backbone.Model.extend;
 
 _.extend(Backbone.ReactiveModel.prototype, {
 	stopListening: function () {
@@ -43,12 +45,12 @@ _.extend(Backbone.ReactiveModel.prototype, {
 		_.each(this._reactiveProps, function (p) {
 			p.stopListening();
 		});
-		this._reactiveProps = this._reactiveSpec = null;
+		this._reactiveProps = this.reactive = null;
 	},
 	_reactiveRecompute: function (propName) {
-		var depValues = _.map(this._reactiveSpec[propName].deps,
+		var depValues = _.map(this.reactive[propName].deps,
 				this._valueOfDependency.bind(this));
-		var value = this._reactiveSpec[propName].compute.apply(null, depValues);
+		var value = this.reactive[propName].compute.apply(null, depValues);
 		console.log(propName + " => " + value);
 		this.set(propName, value);
 	},
@@ -73,20 +75,30 @@ Backbone.ReactiveModel.CollectionPlucker = function (target, targetProp, spec) {
 	this._target = target;
 	this._targetProp = targetProp;
 	this._spec = spec;
+	// The source collection may have been specified either with a direct object reference
+	// or a string naming a property on the model. The latter is useful for situations where
+	// the collection doesn't exist yet at the time the property spec is created,
+	// such as when the model's constructor creates the collection when inheriting from a
+	// prototype that specifies reactive properties.
+	if (typeof spec.collection === "string") {
+		this._source = target.get(spec.collection);
+	} else {
+		this._source = spec.collection;
+	}
 
 	// Compute the initial value.
 	this._recompute();
 
 	// When a dependency changes, recompute.
-	this.listenTo(spec.collection, "add remove reset", this._recompute);
-	spec.collection.each(function (m) {
+	this.listenTo(this._source, "add remove reset", this._recompute);
+	this._source.each(function (m) {
 		that.listenTo(m, "change:" + spec.pluck, that._recompute);
 	});
 };
 
 _.extend(Backbone.ReactiveModel.CollectionPlucker.prototype, Backbone.Events, {
 	_recompute: function () {
-		var value = this._spec.compute.apply(null, this._spec.collection.pluck(this._spec.pluck));
+		var value = this._spec.compute.apply(null, this._source.pluck(this._spec.pluck));
 		this._target.set(this._targetProp, value);
 	}
 });

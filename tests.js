@@ -95,6 +95,16 @@ describe("Reactive Backbone properties", function () {
 	describe("that pluck from a colletion", function () {
 		var source, target, listener;
 
+		var computeSum = function () {
+			var i, sum = 0;
+
+			for (i = 0; i < arguments.length; i++) {
+				sum += arguments[i];
+			}
+
+			return sum;
+		};
+
 		beforeEach(function () {
 			source = new Backbone.Collection([
 				{ value: 1 },
@@ -105,15 +115,7 @@ describe("Reactive Backbone properties", function () {
 					sum: {
 						collection: source,
 						pluck: "value",
-						compute: function () {
-							var i, sum = 0;
-
-							for (i = 0; i < arguments.length; i++) {
-								sum += arguments[i];
-							}
-
-							return sum;
-						}
+						compute: computeSum
 					}
 				}
 			});
@@ -143,6 +145,30 @@ describe("Reactive Backbone properties", function () {
 			expect(listener).toHaveBeenCalledWith(target, 2, {});
 		});
 
+		describe("that is named by a string", function () {
+			it("should bind to the named collection on the same model", function () {
+				var namedSource = new Backbone.Collection([
+					{ value: 3 },
+					{ value: 4 }
+				]);
+				target = new Backbone.ReactiveModel({
+					items: namedSource,
+					reactive: {
+						sum: {
+							collection: "items",
+							pluck: "value",
+							compute: computeSum
+						}
+					}
+				});
+				expect(target.get("sum")).toEqual(7, "Wrong value");
+				listener = jasmine.createSpy("change listener");
+				target.on("change:sum", listener);
+				namedSource.at(0).set("value", 2);
+				expect(listener).toHaveBeenCalledWith(target, 6, {});
+			});
+		});
+
 		describe("When the collection is reset", function () {
 			it("should recompute", function () {
 				source.reset([
@@ -170,5 +196,21 @@ describe("Reactive Backbone properties", function () {
 			source.at(1).set("value", 3);
 			expect(listener).not.toHaveBeenCalled();
 		});
+	});
+
+	it("should inherit from the object's prototype", function () {
+		var DerivedModel = Backbone.ReactiveModel.extend({
+			reactive: {
+				c: {
+					deps: ["a", "b"],
+					compute: function (a, b) { return a + b; }
+				}
+			}
+		});
+		var target = new DerivedModel({
+			a: 1,
+			b: 2
+		});
+		expect(target.get("c")).toEqual(3);
 	});
 });
