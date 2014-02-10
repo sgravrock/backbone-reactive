@@ -10,27 +10,21 @@ Backbone.ReactiveModel = Backbone.Model.extend({
 	
 		Backbone.Model.call(this, attributes, options);
 		// We may get our reactive spec from ctor arguments or inherit them from a prototype.
+		// TODO eliminate this member
 		this.reactive = reactiveAttr || this.reactive || {};
 		this._reactiveProps = [];
 	
 		_.chain(this.reactive).keys().each(function (propName) {
 			var propSpec = this.reactive[propName];
+			var PropCtor;
 	
 			if (propSpec.collection) {
-				this._reactiveProps.push(new Backbone.ReactiveModel.CollectionPlucker(this, propName,
-					propSpec));
+				PropCtor = Backbone.ReactiveModel.CollectionProperty;
 			} else {
-				// Compute the initial value for the dependency
-				this._reactiveRecompute(propName);
-		
-				// When a dependency changes, recompute all properties that depend on it.
-				_.each(propSpec.deps, function (dep) {
-					dep = this._normalizeDependency(dep);
-					this.listenTo(dep.source, "change:" + dep.name, function () {
-						this._reactiveRecompute(propName);
-					});
-				}, this);
+				PropCtor = Backbone.ReactiveModel.BasicProperty;
 			}
+
+			this._reactiveProps.push(new PropCtor(this, propName, propSpec));
 		}, this);
 	},
 	stopListening: function () {
@@ -42,19 +36,39 @@ Backbone.ReactiveModel = Backbone.Model.extend({
 		});
 		this._reactiveProps = this.reactive = null;
 	},
-	_reactiveRecompute: function (propName) {
-		var depValues = _.map(this.reactive[propName].deps,
-				this._valueOfDependency.bind(this));
-		var value = this.reactive[propName].compute.apply(null, depValues);
-		console.log(propName + " => " + value);
-		this.set(propName, value);
+});
+
+Backbone.ReactiveModel.extend = Backbone.Model.extend;
+
+Backbone.ReactiveModel.BasicProperty = function (target, targetProp, spec) {
+	this._target = target;
+	this._targetProp = targetProp;
+	this._spec = spec;
+
+	// Compute the initial value
+	this._recompute();
+
+	// Recompute when any dependency changes
+	_.each(spec.deps, function (dep) {
+		dep = this._normalizeDependency(dep);
+		this.listenTo(dep.source, "change:" + dep.name, function () {
+			this._recompute();
+		});
+	}, this);
+};
+
+_.extend(Backbone.ReactiveModel.BasicProperty.prototype, Backbone.Events, {
+	_recompute: function () {
+		var depValues = _.map(this._spec.deps, this._valueOfDependency.bind(this));
+		var value = this._spec.compute.apply(null, depValues);
+		this._target.set(this._targetProp, value);
 	},
 	_normalizeDependency: function (dep) {
 		if (typeof dep === "object") {
 			return dep;
 		} else {
 			return {
-				source: this,
+				source: this._target,
 				name: dep
 			};
 		}
@@ -65,9 +79,7 @@ Backbone.ReactiveModel = Backbone.Model.extend({
 	}
 });
 
-Backbone.ReactiveModel.extend = Backbone.Model.extend;
-
-Backbone.ReactiveModel.CollectionPlucker = function (target, targetProp, spec) {
+Backbone.ReactiveModel.CollectionProperty = function (target, targetProp, spec) {
 	this._target = target;
 	this._targetProp = targetProp;
 	this._spec = spec;
@@ -96,7 +108,7 @@ Backbone.ReactiveModel.CollectionPlucker = function (target, targetProp, spec) {
 	this.listenTo(this._source, "reset", this._onReset);
 };
 
-_.extend(Backbone.ReactiveModel.CollectionPlucker.prototype, Backbone.Events, {
+_.extend(Backbone.ReactiveModel.CollectionProperty.prototype, Backbone.Events, {
 	_onAdd: function (added) {
 		this.listenTo(added, "change:" + this._spec.pluck, this._recompute);
 		this._recompute();
