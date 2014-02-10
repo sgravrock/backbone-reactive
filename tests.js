@@ -133,16 +133,58 @@ describe("Reactive Backbone properties", function () {
 			expect(listener).toHaveBeenCalledWith(target, 4, {});
 		});
 
-		it("should recompute when a dependency is added", function () {
-			source.add({ value: 3 });
-			expect(target.get("sum")).toEqual(6, "Wrong value");
-			expect(listener).toHaveBeenCalledWith(target, 6, {});
+		describe("When a dependency is added", function () {
+			it("should recompute", function () {
+				source.add({ value: 3 });
+				expect(target.get("sum")).toEqual(6, "Wrong value");
+				expect(listener).toHaveBeenCalledWith(target, 6, {});
+			});
+
+			it("should subscribe to the new dependency", function () {
+				var toAdd = new Backbone.Model({ value: 3 });
+				source.add(toAdd);
+				listener.calls.reset();
+				toAdd.set("value", 4);
+				expect(target.get("sum")).toEqual(7, "Wrong value");
+				expect(listener).toHaveBeenCalledWith(target, 7, {});
+			});
 		});
 
-		it("should recompute when a dependency is removed", function () {
-			source.remove(source.at(0));
-			expect(target.get("sum")).toEqual(2, "Wrong value");
-			expect(listener).toHaveBeenCalledWith(target, 2, {});
+		describe("When a dependency is removed", function () {
+			it("should recompute", function () {
+				source.remove(source.at(0));
+				expect(target.get("sum")).toEqual(2, "Wrong value");
+				expect(listener).toHaveBeenCalledWith(target, 2, {});
+			});
+
+			it("should unsubscribe from the removed dependency", function () {
+				var removed = source.remove(source.at(0));
+				listener.calls.reset();
+				removed.set("value", 4);
+				expect(target.get("sum")).toEqual(2, "Wrong value");
+				expect(listener).not.toHaveBeenCalled();
+				expect(isReachable(target, removed)).toEqual(false);
+			});
+		});
+
+		describe("When the collection is reset", function () {
+			it("should recompute", function () {
+				source.reset([
+					{ value: 5 },
+					{ value: 10 }
+				]);
+				expect(target.get("sum")).toEqual(15, "Wrong value");
+				expect(listener).toHaveBeenCalledWith(target, 15, {});
+			});
+
+			it("should stop listening to the old contents", function () {
+				var old = source.at(0);
+				source.reset([]);
+				listener.calls.reset();
+				old.set("value", 3);
+				expect(listener).not.toHaveBeenCalled();
+				expect(isReachable(target, old)).toEqual(false);
+			});
 		});
 
 		describe("that is named by a string", function () {
@@ -166,25 +208,6 @@ describe("Reactive Backbone properties", function () {
 				target.on("change:sum", listener);
 				namedSource.at(0).set("value", 2);
 				expect(listener).toHaveBeenCalledWith(target, 6, {});
-			});
-		});
-
-		describe("When the collection is reset", function () {
-			it("should recompute", function () {
-				source.reset([
-					{ value: 5 },
-					{ value: 10 }
-				]);
-				expect(target.get("sum")).toEqual(15, "Wrong value");
-				expect(listener).toHaveBeenCalledWith(target, 15, {});
-			});
-
-			it("should stop listening to the old contents", function () {
-				var old = source.at(0);
-				source.reset([]);
-				listener.calls.reset();
-				old.set("value", 3);
-				expect(listener).not.toHaveBeenCalled();
 			});
 		});
 

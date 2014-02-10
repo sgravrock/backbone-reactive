@@ -90,13 +90,33 @@ Backbone.ReactiveModel.CollectionPlucker = function (target, targetProp, spec) {
 	this._recompute();
 
 	// When a dependency changes, recompute.
-	this.listenTo(this._source, "add remove reset", this._recompute);
 	this._source.each(function (m) {
 		that.listenTo(m, "change:" + spec.pluck, that._recompute);
 	});
+
+	// Update our subscriptions when dependencies are added or removed.
+	this.listenTo(this._source, "add", this._onAdd);
+	this.listenTo(this._source, "remove", this._onRemove);
+	this.listenTo(this._source, "reset", this._onReset);
 };
 
 _.extend(Backbone.ReactiveModel.CollectionPlucker.prototype, Backbone.Events, {
+	_onAdd: function (added) {
+		this.listenTo(added, "change:" + this._spec.pluck, this._recompute);
+		this._recompute();
+	},
+	_onRemove: function (removed) {
+		this.stopListening(removed);
+		this._recompute();
+	},
+	_onReset: function () {
+		var that = this;
+		this.stopListening();
+		this._source.each(function (m) {
+			that.listenTo(m, "change:" + that._spec.pluck, that._recompute);
+		});
+		this._recompute();
+	},
 	_recompute: function () {
 		var value = this._spec.compute.apply(null, this._source.pluck(this._spec.pluck));
 		this._target.set(this._targetProp, value);
